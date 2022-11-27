@@ -51,7 +51,9 @@ from ipolutils.read_text_file import read_commented_text_file
 import sys
 ROOT = os.path.dirname(os.path.abspath(__file__)) + "/../../.."
 sys.path.append(os.path.abspath(ROOT))
+
 from ipol_demo.modules.dispatcher import dispatcher
+from ipol_demo.modules.conversion import conversion
 
 def authenticate(func):
     """
@@ -171,6 +173,7 @@ class Core():
             demorunners=dispatcher.parse_demorunners(demorunners_path),
             policy=dispatcher.make_policy(policy)
         )
+        self.converter = conversion.Converter()
 
     def read_authorized_patterns(self):
         """
@@ -1139,11 +1142,8 @@ attached the failed experiment data.". \
         try:
             inputs_names = self.copy_blobs(work_dir, demo_id, origin, blobs, blobset_id, ddl_inputs)
             self.copy_inpainting_data(work_dir, blobs, ddl_inputs)
-            params_conv = {'work_dir': work_dir}
-            params_conv['inputs_description'] = json.dumps(ddl_inputs)
-            params_conv['crop_info'] = json.dumps(crop_info)
-            resp = self.post('api/conversion/convert', data=params_conv)
-            resp = resp.json()
+            resp = self.converter.convert(work_dir=work_dir, input_list=ddl_inputs, crop_info=crop_info)
+
             # something went wrong in conversion module, transmit error
             if resp['status'] != 'OK':
                 raise IPOLConversionError(resp['error'])
@@ -1544,6 +1544,15 @@ attached the failed experiment data.". \
         """
         stats = self.dispatcher.get_demorunners_stats()
         return json.dumps({'status': 'OK', 'demorunners': stats}).encode()
+
+    @cherrypy.expose
+    def convert_tiff_to_png(self, img):
+        """
+        Converts the input TIFF to PNG.
+        This is used by the web interface for visualization purposes
+        """
+        data = self.converter.convert_tiff_to_png(img)
+        return json.dumps(data, indent=4).encode()
 
     @staticmethod
     def post(api_url, **kwargs):
